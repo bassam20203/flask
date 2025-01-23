@@ -1,173 +1,136 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS  # استيراد مكتبة CORS
-import requests
-import base64
-import json
+# from flask import Flask, request, jsonify
+# import os
+# import json
 
-app = Flask(__name__)
-CORS(app)  # تمكين CORS للتطبيق
+# app = Flask(__name__)
 
-# إعدادات GitHub
-GITHUB_TOKEN = "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"  # استبدل بـ GitHub Token
-REPO_OWNER = "bassam20203"  # اسم مالك المستودع
-REPO_NAME = "flask"  # اسم المستودع
-BRANCH = "main"  # اسم الفرع
+# if not os.path.exists('JSON'):
+#     os.makedirs('JSON')
 
-# دالة لقراءة ملف من GitHub
-def get_file_from_github(file_path):
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}?ref={BRANCH}"
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        content = response.json().get("content", "")
-        return base64.b64decode(content).decode("utf-8")
-    else:
-        raise Exception(f"خطأ في قراءة الملف: {response.status_code} - {response.text}")
+# # CORS Headers
+# @app.after_request
+# def after_request(response):
+#     response.headers.add('Access-Control-Allow-Origin', '*')
+#     response.headers.add('Access-Control-Allow-Headers', '*')
+#     response.headers.add('Access-Control-Allow-Methods', '*')
+#     return response
 
-# دالة لتحديث ملف في GitHub
-def update_file_in_github(file_path, content, commit_message):
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
+# # Update student data
+# @app.route('/update-student', methods=['POST'])
+# def update_student():
+#     data = request.get_json()
+#     stage = data.get('stage')
+#     rollNumber = data.get('rollNumber')
+#     updatedStudent = data.get('updatedStudent')
 
-    # الحصول على SHA الخاص بالملف
-    response = requests.get(url, headers=headers, params={"ref": BRANCH})
-    if response.status_code != 200:
-        raise Exception(f"خطأ في جلب معلومات الملف: {response.status_code} - {response.text}")
-    sha = response.json().get("sha", "")
+#     if not stage or not rollNumber or not updatedStudent:
+#         return jsonify({"message": "البيانات غير مكتملة"}), 400
 
-    # تحديث الملف
-    data = {
-        "message": commit_message,
-        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
-        "sha": sha,
-        "branch": BRANCH
-    }
-    response = requests.put(url, headers=headers, json=data)
-    if response.status_code == 200:
-        return True
-    else:
-        raise Exception(f"خطأ في تحديث الملف: {response.status_code} - {response.text}")
+#     file_path = os.path.join('JSON', f'{stage}.json')
 
-# تحديث بيانات طالب
-@app.route('/update-student', methods=['POST'])
-def update_student():
-    data = request.get_json()
-    stage = data.get('stage')
-    rollNumber = data.get('rollNumber')
-    updatedStudent = data.get('updatedStudent')
+#     try:
+#         with open(file_path, 'r', encoding='utf-8') as file:
+#             json_data = json.load(file)
 
-    if not stage or not rollNumber or not updatedStudent:
-        return jsonify({"message": "البيانات غير مكتملة"}), 400
+#         if not json_data.get('resalt') or not isinstance(json_data['resalt'], list):
+#             return jsonify({"message": "البيانات في الملف غير صالحة"}), 500
 
-    file_path = f"JSON/{stage}.json"
+#         student_index = next(
+#             (index for index, student in enumerate(json_data['resalt'])
+#              if student.get('rollNumber') and str(student['rollNumber']) == str(rollNumber)),
+#             -1
+#         )
 
-    try:
-        # قراءة الملف من GitHub
-        content = get_file_from_github(file_path)
-        json_data = json.loads(content)
+#         if student_index == -1:
+#             return jsonify({"message": "الطالب غير موجود"}), 404
 
-        if not json_data.get('resalt') or not isinstance(json_data['resalt'], list):
-            return jsonify({"message": "البيانات في الملف غير صالحة"}), 500
+#         student = json_data['resalt'][student_index]
+#         for key, value in updatedStudent.items():
+#             if key in student:
+#                 student[key] = value
 
-        student_index = next(
-            (index for index, student in enumerate(json_data['resalt'])
-             if student.get('rollNumber') and str(student['rollNumber']) == str(rollNumber)),
-            -1
-        )
+#         with open(file_path, 'w', encoding='utf-8') as file:
+#             json.dump(json_data, file, indent=2, ensure_ascii=False)
 
-        if student_index == -1:
-            return jsonify({"message": "الطالب غير موجود"}), 404
+#         return jsonify({"message": "تم حفظ التعديلات بنجاح"}), 200
+#     except Exception as e:
+#         return jsonify({"message": "خطأ في قراءة أو حفظ الملف", "error": str(e)}), 500
 
-        student = json_data['resalt'][student_index]
-        for key, value in updatedStudent.items():
-            if key in student:
-                student[key] = value
+# # Get file content
+# @app.route('/get-file', methods=['GET'])
+# def get_file():
+#     stage = request.args.get('stage')
 
-        # تحديث الملف في GitHub
-        update_file_in_github(file_path, json.dumps(json_data, indent=2, ensure_ascii=False), "Update student data")
+#     if not stage:
+#         return jsonify({"message": "المرحلة غير محددة"}), 400
 
-        return jsonify({"message": "تم حفظ التعديلات بنجاح"}), 200
-    except Exception as e:
-        return jsonify({"message": "خطأ في قراءة أو حفظ الملف", "error": str(e)}), 500
+#     file_path = os.path.join('JSON', f'{stage}.json')
 
-# قراءة محتوى ملف
-@app.route('/get-file', methods=['GET'])
-def get_file():
-    stage = request.args.get('stage')
+#     try:
+#         with open(file_path, 'r', encoding='utf-8') as file:
+#             content = file.read()
+#         return jsonify({"content": content}), 200
+#     except Exception as e:
+#         return jsonify({"message": "خطأ في قراءة الملف", "error": str(e)}), 500
 
-    if not stage:
-        return jsonify({"message": "المرحلة غير محددة"}), 400
+# # Save file content
+# @app.route('/save-file', methods=['POST'])
+# def save_file():
+#     data = request.get_json()  # Parse JSON body
+#     stage = data.get('stage')
+#     content = data.get('content')
 
-    file_path = f"JSON/{stage}.json"
+#     if not stage or not content:
+#         return jsonify({"message": "البيانات غير مكتملة"}), 400
 
-    try:
-        content = get_file_from_github(file_path)
-        return jsonify({"content": content}), 200
-    except Exception as e:
-        return jsonify({"message": "خطأ في قراءة الملف", "error": str(e)}), 500
+#     try:
+#         # Validate JSON content
+#         json.loads(content)
+#     except ValueError as e:
+#         print(f"Invalid JSON content: {e}")  # Log the error
+#         return jsonify({"message": "تنسيق JSON غير صحيح", "error": str(e)}), 400
 
-# حفظ محتوى ملف
-@app.route('/save-file', methods=['POST'])
-def save_file():
-    data = request.get_json()
-    stage = data.get('stage')
-    content = data.get('content')
+#     file_path = os.path.join('JSON', f'{stage}.json')
+#     print(f"Saving file to: {file_path}")  # Debugging line
 
-    if not stage or not content:
-        return jsonify({"message": "البيانات غير مكتملة"}), 400
+#     try:
+#         with open(file_path, 'w', encoding='utf-8') as file:
+#             file.write(content)
+#         return jsonify({"message": "تم حفظ الملف بنجاح"}), 200
+#     except Exception as e:
+#         print(f"Error saving file: {e}")  # Log the error
+#         return jsonify({"message": "خطأ في حفظ الملف", "error": str(e)}), 500
 
-    try:
-        # التحقق من صحة JSON
-        json.loads(content)
-    except ValueError as e:
-        return jsonify({"message": "تنسيق JSON غير صحيح", "error": str(e)}), 400
+# # Get student result
+# @app.route('/get-result', methods=['GET'])
+# def get_result():
+#     stage = request.args.get('stage')
+#     rollNumber = request.args.get('rollNumber')
 
-    file_path = f"JSON/{stage}.json"
+#     if not stage or not rollNumber:
+#         return jsonify({"message": "البيانات غير مكتملة"}), 400
 
-    try:
-        update_file_in_github(file_path, content, "Update file content")
-        return jsonify({"message": "تم حفظ الملف بنجاح"}), 200
-    except Exception as e:
-        return jsonify({"message": "خطأ في حفظ الملف", "error": str(e)}), 500
+#     file_path = os.path.join('JSON', f'{stage}.json')
 
-# الحصول على نتيجة طالب
-@app.route('/get-result', methods=['GET'])
-def get_result():
-    stage = request.args.get('stage')
-    rollNumber = request.args.get('rollNumber')
+#     try:
+#         with open(file_path, 'r', encoding='utf-8') as file:
+#             json_data = json.load(file)
 
-    if not stage or not rollNumber:
-        return jsonify({"message": "البيانات غير مكتملة"}), 400
+#         if not json_data.get('resalt') or not isinstance(json_data['resalt'], list):
+#             return jsonify({"message": "البيانات في الملف غير صالحة"}), 500
 
-    file_path = f"JSON/{stage}.json"
+#         student = next(
+#             (s for s in json_data['resalt']
+#              if s.get('rollNumber') and str(s['rollNumber']) == str(rollNumber)),
+#             None
+#         )
 
-    try:
-        content = get_file_from_github(file_path)
-        json_data = json.loads(content)
+#         if not student:
+#             return jsonify({"message": "الطالب غير موجود"}), 404
 
-        if not json_data.get('resalt') or not isinstance(json_data['resalt'], list):
-            return jsonify({"message": "البيانات في الملف غير صالحة"}), 500
+#         return jsonify({"message": "تم العثور على الطالب", "student": student}), 200
+#     except Exception as e:
+#         return jsonify({"message": "خطأ في قراءة الملف", "error": str(e)}), 500
 
-        student = next(
-            (s for s in json_data['resalt']
-             if s.get('rollNumber') and str(s['rollNumber']) == str(rollNumber)),
-            None
-        )
-
-        if not student:
-            return jsonify({"message": "الطالب غير موجود"}), 404
-
-        return jsonify({"message": "تم العثور على الطالب", "student": student}), 200
-    except Exception as e:
-        return jsonify({"message": "خطأ في قراءة الملف", "error": str(e)}), 500
-
-# تشغيل التطبيق
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-    
+# if __name__ == '__main__':
+#     app.run(host='0.0.0.0', port=5000, debug=True)
