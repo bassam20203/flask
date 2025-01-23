@@ -134,3 +134,84 @@
 
 # if __name__ == '__main__':
 #     app.run(host='0.0.0.0', port=5000, debug=True)
+from flask import Flask, request, jsonify
+import os
+import json
+
+app = Flask(__name__)
+
+# مسار لجلب محتوى الملف
+@app.route('/get-file', methods=['GET'])
+def get_file():
+    stage = request.args.get('stage')  # الحصول على المرحلة من الطلب
+    if not stage:
+        return jsonify({"error": "المرحلة غير محددة"}), 400
+
+    # مسار ملف JSON بناءً على المرحلة
+    file_path = os.path.join("JSON", f"{stage}.json")
+
+    # التحقق من وجود الملف
+    if not os.path.exists(file_path):
+        return jsonify({"error": "الملف غير موجود"}), 404
+
+    # قراءة الملف وإرجاع محتواه
+    with open(file_path, "r", encoding="utf-8") as file:
+        file_content = json.load(file)
+
+    return jsonify({"content": file_content}), 200
+
+# مسار لحفظ الملف
+@app.route('/save-file', methods=['POST'])
+def save_file():
+    data = request.json  # الحصول على البيانات المرسلة
+    if not data or 'stage' not in data or 'content' not in data:
+        return jsonify({"message": "المرحلة أو المحتوى غير محدد"}), 400
+
+    stage = data['stage']
+    content = data['content']
+
+    # مسار ملف JSON بناءً على المرحلة
+    file_path = os.path.join("JSON", f"{stage}.json")
+
+    # حفظ المحتوى في الملف
+    try:
+        with open(file_path, "w", encoding="utf-8") as file:
+            json.dump(content, file, ensure_ascii=False, indent=4)
+        return jsonify({"message": "تم حفظ الملف بنجاح"}), 200
+    except Exception as e:
+        return jsonify({"message": f"حدث خطأ أثناء حفظ الملف: {str(e)}"}), 500
+
+# مسار لتحديث بيانات الطالب
+@app.route('/update-student', methods=['POST'])
+def update_student():
+    data = request.json  # الحصول على البيانات المرسلة
+    if not data or 'student_id' not in data or 'new_data' not in data:
+        return jsonify({"message": "بيانات الطالب غير مكتملة"}), 400
+
+    student_id = data['student_id']
+    new_data = data['new_data']
+
+    # هنا يمكنك تحديث بيانات الطالب في قاعدة البيانات أو ملف JSON
+    # هذا مثال بسيط:
+    print(f"تم تحديث بيانات الطالب {student_id}: {new_data}")
+
+    return jsonify({"message": "تم تحديث بيانات الطالب بنجاح"}), 200
+
+# مسار لجلب نتيجة الطالب
+@app.route('/get-result', methods=['GET'])
+def get_result():
+    student_id = request.args.get('student_id')  # الحصول على معرف الطالب من الطلب
+    if not student_id:
+        return jsonify({"error": "معرف الطالب غير محدد"}), 400
+
+    # هنا يمكنك جلب نتيجة الطالب من قاعدة البيانات أو ملف JSON
+    # هذا مثال بسيط:
+    result = {
+        "student_id": student_id,
+        "grades": {"math": 90, "science": 85, "history": 78}
+    }
+
+    return jsonify(result), 200
+
+if __name__ == '__main__':
+    app.run(debug=True)
